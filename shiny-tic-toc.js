@@ -90,13 +90,13 @@ function showSummarisedMeasurements() {
   const measurements = performance.getEntriesByType("measure");
 
   const slowestServerComputation = Math.max(
-    measurements
+    ...measurements
       .filter(entry => entry.name === serverComputationLabel)
       .map(entry => entry.duration)
   );
 
   const slowestOutputComputation = Math.max(
-    measurements
+    ...measurements
       .filter(entry => entry.name !== serverComputationLabel)
       .map(entry => entry.duration)
   );
