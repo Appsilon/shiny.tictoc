@@ -124,12 +124,8 @@ function getCurrentDateTime() {
   return formattedDateTime;
 }
 
-function downloadCsvFile(data) {
-  const csvContent = data.map(e => e.join(",")).join("\n");
-
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8' })
-
-  const filename = `${getCurrentDateTime()}-tictoc.csv`;
+function downloadFile(content, contentType, filename) {
+  const blob = new Blob([content], {type: contentType});
 
   const link = document.createElement('a')
   const url = window.URL.createObjectURL(blob)
@@ -140,14 +136,191 @@ function downloadCsvFile(data) {
   window.URL.revokeObjectURL(url);
 }
 
-function exportMeasurements() {
-  const dataHeader = ["measurement_id", "duration (ms)"];
+function downloadCsvFile(data) {
+  const csvContent = data.map(e => e.join(",")).join("\n");
 
-  const measurementData = performance.getEntries()
-    .filter(entry => entry.entryType === 'measure')
-    .map(measurement => [measurement.name, measurement.duration]);
+  downloadFile(
+    csvContent,
+    'text/csv;charset=utf-8',
+    `${getCurrentDateTime()}-tictoc.csv`
+  )
+}
+
+function getMeasurements() {
+  return performance.getEntries()
+    .filter(entry => entry.entryType === 'measure');
+}
+
+function prepareCsvData() {
+  const dataHeader = ["measurement_id", "duration (ms)", "start_time"];
+
+  const measurementData = getMeasurements()
+    .map(measurement => [measurement.name, measurement.duration, measurement.startTime]);
 
   const csvData = [dataHeader].concat(measurementData);
 
+  return csvData;
+}
+
+function exportMeasurements() {
+  csvData = prepareCsvData();
+
   downloadCsvFile(csvData);
+}
+
+async function createHtmlReport() {
+  const measurementData = getMeasurements();
+
+  const report = document.implementation.createHTMLDocument("shiny.tictoc report");
+
+  // Data Script
+  const dataScript = document.createElement("script");
+  dataScript.id = "measurementData";
+  dataScript.type = type="application/json";
+  dataScript.innerText = `${JSON.stringify(measurementData)}`;
+
+  // Plot div
+  const plotDiv = document.createElement("div");
+  plotDiv.id = "measurementsTimeline";
+  plotDiv.style.height = "100vh";
+
+  // Echarts script
+  const echartsCDN = "https://cdn.jsdelivr.net/npm/echarts@5.4.3/dist/echarts.min.js";
+  const echartsLibSourceCode = await fetch(echartsCDN).then(response => response.text());
+  const echartsLibraryScriptTag = document.createElement("script");
+  echartsLibraryScriptTag.text = echartsLibSourceCode;
+
+  // Plotting Script
+  function plotMeasurements() {
+      var chartDom = document.getElementById('measurementsTimeline');
+      var myChart = echarts.init(chartDom);
+      var option;
+
+
+      const measurementData = JSON.parse(document.getElementById('measurementData').text);
+      const measurementIds = measurementData.map(entry => entry.name);
+      const uniqueMeasurementIds = [...new Set(measurementIds)];
+
+      const plotData = measurementData.map(
+        entry => {
+          const measurementIdIndex = uniqueMeasurementIds.indexOf(entry.name);
+
+          return {
+            name: entry.name,
+            value: [
+              measurementIdIndex,
+              entry.startTime,
+              entry.startTime + entry.duration,
+              entry.duration
+            ]
+          }
+        }
+      );
+
+      function renderItem(params, api) {
+        var categoryIndex = api.value(0);
+        var start = api.coord([api.value(1), categoryIndex]);
+        var end = api.coord([api.value(2), categoryIndex]);
+        var height = api.size([0, 1])[1] * 0.6;
+        var rectShape = echarts.graphic.clipRectByRect(
+          {
+            x: start[0],
+            y: start[1] - height / 2,
+            width: end[0] - start[0],
+            height: height
+          },
+          {
+            x: params.coordSys.x,
+            y: params.coordSys.y,
+            width: params.coordSys.width,
+            height: params.coordSys.height
+          }
+        );
+        return (
+          rectShape && {
+            type: 'rect',
+            transition: ['shape'],
+            shape: rectShape,
+            style: api.style()
+          }
+        );
+      }
+      option = {
+        tooltip: {
+          formatter: function (params) {
+            return params.marker + params.name + ': ' + params.value[3] + ' ms';
+          }
+        },
+        title: {
+          text: 'shiny.tictoc report',
+          left: 'center'
+        },
+        dataZoom: [
+          {
+            type: 'slider',
+            filterMode: 'weakFilter',
+            showDataShadow: false,
+            top: 400,
+            labelFormatter: ''
+          },
+          {
+            type: 'inside',
+            filterMode: 'weakFilter'
+          }
+        ],
+        grid: {
+          height: 300,
+          containLabel: true
+        },
+        xAxis: {
+          min: 0,
+          scale: true,
+          axisLabel: {
+            formatter: function (val) {
+              return Math.max(0, val) + ' ms';
+            }
+          }
+        },
+        yAxis: {
+          data: uniqueMeasurementIds
+        },
+        series: [
+          {
+            type: 'custom',
+            renderItem: renderItem,
+            itemStyle: {
+              opacity: 0.8
+            },
+            encode: {
+              x: [1, 2],
+              y: 0
+            },
+            data: plotData
+          }
+        ]
+      };
+
+      option && myChart.setOption(option);
+  }
+
+  const plottingScript = document.createElement("script");
+  plottingScript.text = `${plotMeasurements.toString()}; window.onload = plotMeasurements`;
+
+  report.head.appendChild(echartsLibraryScriptTag);
+  report.head.appendChild(dataScript);
+  report.head.appendChild(plottingScript);
+
+  report.body.appendChild(plotDiv);
+
+  return report;
+}
+
+async function exportHtmlReport() {
+  const htmlReport = await createHtmlReport();
+
+  downloadFile(
+    htmlReport.documentElement.innerHTML,
+    'text/html;charset=utf-8',
+    `${getCurrentDateTime()}-tictoc.html`
+  )
 }
