@@ -30,4 +30,7 @@ exportMeasurements()
 
 // To print out summarised measurements (slowest rendering output, slowest server computation)
 showSummarisedMeasurements()
+
+// To export an html file that visualizes measurements on a timeline
+await exportHtmlReport()
 ```
