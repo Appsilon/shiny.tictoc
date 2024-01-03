@@ -14,44 +14,16 @@ function makeMeasurementLabel(id) {
   return makeLabel(id, 'measurement')
 }
 
-function outputRecalculatingHandler(event) {
-  const outputId = event.target.id;
-
-  const startMarkLabel = makeStartMarkLabel(outputId);
+function startMeasurement(id) {
+  const startMarkLabel = makeStartMarkLabel(id);
 
   performance.mark(startMarkLabel);
 }
 
-function outputValueHandler(event) {
-  const outputId = event.target.id;
-
-  const startMarkLabel = makeStartMarkLabel(outputId);
-  const endMarkLabel = makeEndMarkLabel(outputId);
-  const measurementLabel = makeMeasurementLabel(outputId);
-
-  // setTimeout to end measuring after the output JS code is run
-  // See https://github.com/rstudio/shiny/issues/2127
-  setTimeout(() => {
-    performance.mark(endMarkLabel);
-
-    performance.measure(
-      measurementLabel,
-      startMarkLabel,
-      endMarkLabel
-    );
-  }, 0);
-}
-
-function serverBusyHandler(event) {
-  const startMarkLabel = makeStartMarkLabel("server_computation");
-
-  performance.mark(startMarkLabel);
-}
-
-function serverIdleHandler(event) {
-  const startMarkLabel = makeStartMarkLabel("server_computation");
-  const endMarkLabel = makeEndMarkLabel("server_computation");
-  const measurementLabel = makeMeasurementLabel("server_computation");
+function endMeasurement(id) {
+  const startMarkLabel = makeStartMarkLabel(id);
+  const endMarkLabel = makeEndMarkLabel(id);
+  const measurementLabel = makeMeasurementLabel(id);
 
   performance.mark(endMarkLabel);
 
@@ -62,8 +34,46 @@ function serverIdleHandler(event) {
   );
 }
 
-$(document).ready(function () {
+function outputRecalculatingHandler(event) {
+  const outputId = event.target.id;
 
+  startMeasurement(outputId);
+}
+
+function outputValueHandler(event) {
+  const outputId = event.target.id;
+
+  // setTimeout to end measuring after the output JS code is run
+  // See https://github.com/rstudio/shiny/issues/2127
+  setTimeout(() => {
+    endMeasurement(outputId);
+  }, 0);
+}
+
+function serverBusyHandler(event) {
+  startMeasurement("server_computation");
+}
+
+function serverIdleHandler(event) {
+  endMeasurement("server_computation");
+}
+
+function customMessageEventHandler(event) {
+  if (event.message.custom === undefined) {
+    return;
+  }
+
+  const handlerName = Object.keys(event.message.custom)[0];
+  startMeasurement(handlerName);
+
+  setTimeout(() => {
+    endMeasurement(handlerName);
+  }, 0)
+}
+
+
+
+$(document).ready(function () {
   // Handler for output start marks
   $(document).on('shiny:recalculating', outputRecalculatingHandler);
 
@@ -75,6 +85,9 @@ $(document).ready(function () {
 
   // Handler for server calculation end marks
   $(document).on('shiny:idle', serverIdleHandler);
+
+  // Handler for custom handlers
+  $(document).on('shiny:message', customMessageEventHandler);
 });
 
 function showAllMeasurements() {
