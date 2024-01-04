@@ -20,7 +20,7 @@ function startMeasurement(id) {
   performance.mark(startMarkLabel);
 }
 
-function endMeasurement(id) {
+function endMeasurement(id, type) {
   const startMarkLabel = makeStartMarkLabel(id);
   const endMarkLabel = makeEndMarkLabel(id);
   const measurementLabel = makeMeasurementLabel(id);
@@ -29,8 +29,13 @@ function endMeasurement(id) {
 
   performance.measure(
     measurementLabel,
-    startMarkLabel,
-    endMarkLabel
+    {
+      detail: {
+        type: type
+      },
+      start: startMarkLabel,
+      end: endMarkLabel
+    }
   );
 }
 
@@ -46,7 +51,7 @@ function outputValueHandler(event) {
   // setTimeout to end measuring after the output JS code is run
   // See https://github.com/rstudio/shiny/issues/2127
   setTimeout(() => {
-    endMeasurement(outputId);
+    endMeasurement(outputId, "output");
   }, 0);
 }
 
@@ -55,7 +60,7 @@ function serverBusyHandler(event) {
 }
 
 function serverIdleHandler(event) {
-  endMeasurement("server_computation");
+  endMeasurement("server_computation", "server_computation");
 }
 
 function customMessageEventHandler(event) {
@@ -67,7 +72,7 @@ function customMessageEventHandler(event) {
   startMeasurement(handlerName);
 
   setTimeout(() => {
-    endMeasurement(handlerName);
+    endMeasurement(handlerName, "custom_message_handler");
   }, 0)
 }
 
@@ -161,14 +166,26 @@ function downloadCsvFile(data) {
 
 function getMeasurements() {
   return performance.getEntries()
-    .filter(entry => entry.entryType === 'measure');
+    .filter(entry => entry.entryType === 'measure')
+    .map(entry => ({
+      name: entry.name,
+      duration: entry.duration,
+      startTime: entry.startTime,
+      type: entry.detail.type
+    }));
+
 }
 
 function prepareCsvData() {
-  const dataHeader = ["measurement_id", "duration (ms)", "start_time"];
+  const dataHeader = ["measurement_id", "duration (ms)", "start_time", "type"];
 
   const measurementData = getMeasurements()
-    .map(measurement => [measurement.name, measurement.duration, measurement.startTime]);
+    .map(measurement => [
+      measurement.name,
+      measurement.duration,
+      measurement.startTime,
+      measurement.type
+    ]);
 
   const csvData = [dataHeader].concat(measurementData);
 
@@ -187,6 +204,10 @@ function plotMeasurements() {
   const myChart = echarts.init(chartDom);
   var option;
 
+  const measureTypeToColor = new Map()
+  measureTypeToColor.set('server_computation', '#7b9ce1');
+  measureTypeToColor.set('output', '#bd6d6c');
+  measureTypeToColor.set('custom_message_handler', '#75d874');
 
   const measurementData = JSON.parse(document.getElementById('measurementData').text);
   const measurementIds = measurementData.map(entry => entry.name);
@@ -202,18 +223,24 @@ function plotMeasurements() {
           measurementIdIndex,
           entry.startTime,
           entry.startTime + entry.duration,
-          entry.duration
-        ]
+          entry.duration,
+          entry.type
+        ],
+        itemStyle: {
+          normal: {
+            color: measureTypeToColor.get(entry.type)
+          }
+        }
       }
     }
   );
 
   function renderItem(params, api) {
-    const categoryIndex = api.value(0);
-    const start = api.coord([api.value(1), categoryIndex]);
-    const end = api.coord([api.value(2), categoryIndex]);
-    const height = api.size([0, 1])[1] * 0.6;
-    const rectShape = echarts.graphic.clipRectByRect(
+    var categoryIndex = api.value(0);
+    var start = api.coord([api.value(1), categoryIndex]);
+    var end = api.coord([api.value(2), categoryIndex]);
+    var height = api.size([0, 1])[1] * 0.6;
+    var rectShape = echarts.graphic.clipRectByRect(
       {
         x: start[0],
         y: start[1] - height / 2,
@@ -236,11 +263,10 @@ function plotMeasurements() {
       }
     );
   }
-
   option = {
     tooltip: {
       formatter: function (params) {
-        return params.marker + params.name + ': ' + params.value[3] + ' ms';
+        return params.marker + params.name + ': ' + params.value[3] + ' ms ' + `<br>type: ${params.value[4]}`;
       }
     },
     title: {
