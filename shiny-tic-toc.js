@@ -11,7 +11,7 @@ function makeEndMarkLabel(id) {
 }
 
 function makeMeasurementLabel(id) {
-  return makeLabel(id, 'measurement')
+  return id;
 }
 
 function startMeasurement(id) {
