@@ -236,11 +236,11 @@ function plotMeasurements() {
   );
 
   function renderItem(params, api) {
-    var categoryIndex = api.value(0);
-    var start = api.coord([api.value(1), categoryIndex]);
-    var end = api.coord([api.value(2), categoryIndex]);
-    var height = api.size([0, 1])[1] * 0.6;
-    var rectShape = echarts.graphic.clipRectByRect(
+    const categoryIndex = api.value(0);
+    const start = api.coord([api.value(1), categoryIndex]);
+    const end = api.coord([api.value(2), categoryIndex]);
+    const height = api.size([0, 1])[1] * 0.6;
+    const rectShape = echarts.graphic.clipRectByRect(
       {
         x: start[0],
         y: start[1] - height / 2,
