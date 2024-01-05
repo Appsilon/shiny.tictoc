@@ -125,7 +125,7 @@ function getCurrentDateTime() {
 }
 
 function downloadFile(content, contentType, filename) {
-  const blob = new Blob([content], {type: contentType});
+  const blob = new Blob([content], { type: contentType });
 
   const link = document.createElement('a')
   const url = window.URL.createObjectURL(blob)
@@ -168,6 +168,120 @@ function exportMeasurements() {
   downloadCsvFile(csvData);
 }
 
+// Plotting script
+function plotMeasurements() {
+  const chartDom = document.getElementById('measurementsTimeline');
+  const myChart = echarts.init(chartDom);
+  var option;
+
+
+  const measurementData = JSON.parse(document.getElementById('measurementData').text);
+  const measurementIds = measurementData.map(entry => entry.name);
+  const uniqueMeasurementIds = [...new Set(measurementIds)];
+
+  const plotData = measurementData.map(
+    entry => {
+      const measurementIdIndex = uniqueMeasurementIds.indexOf(entry.name);
+
+      return {
+        name: entry.name,
+        value: [
+          measurementIdIndex,
+          entry.startTime,
+          entry.startTime + entry.duration,
+          entry.duration
+        ]
+      }
+    }
+  );
+
+  function renderItem(params, api) {
+    const categoryIndex = api.value(0);
+    const start = api.coord([api.value(1), categoryIndex]);
+    const end = api.coord([api.value(2), categoryIndex]);
+    const height = api.size([0, 1])[1] * 0.6;
+    const rectShape = echarts.graphic.clipRectByRect(
+      {
+        x: start[0],
+        y: start[1] - height / 2,
+        width: end[0] - start[0],
+        height: height
+      },
+      {
+        x: params.coordSys.x,
+        y: params.coordSys.y,
+        width: params.coordSys.width,
+        height: params.coordSys.height
+      }
+    );
+    return (
+      rectShape && {
+        type: 'rect',
+        transition: ['shape'],
+        shape: rectShape,
+        style: api.style()
+      }
+    );
+  }
+
+  option = {
+    tooltip: {
+      formatter: function (params) {
+        return params.marker + params.name + ': ' + params.value[3] + ' ms';
+      }
+    },
+    title: {
+      text: 'shiny.tictoc report',
+      left: 'center'
+    },
+    dataZoom: [
+      {
+        type: 'slider',
+        filterMode: 'weakFilter',
+        showDataShadow: false,
+        top: 400,
+        labelFormatter: ''
+      },
+      {
+        type: 'inside',
+        filterMode: 'weakFilter'
+      }
+    ],
+    grid: {
+      height: 300,
+      containLabel: true
+    },
+    xAxis: {
+      min: 0,
+      scale: true,
+      axisLabel: {
+        formatter: function (val) {
+          return Math.max(0, val) + ' ms';
+        }
+      }
+    },
+    yAxis: {
+      data: uniqueMeasurementIds
+    },
+    series: [
+      {
+        type: 'custom',
+        renderItem: renderItem,
+        itemStyle: {
+          opacity: 0.8
+        },
+        encode: {
+          x: [1, 2],
+          y: 0
+        },
+        data: plotData
+      }
+    ]
+  };
+
+  myChart.setOption(option);
+}
+
 async function createHtmlReport() {
   const measurementData = getMeasurements();
 
@@ -176,7 +290,7 @@ async function createHtmlReport() {
   // Data Script
   const dataScript = document.createElement("script");
   dataScript.id = "measurementData";
-  dataScript.type = type="application/json";
+  dataScript.type = type = "application/json";
   dataScript.innerText = `${JSON.stringify(measurementData)}`;
 
   // Plot div
@@ -189,119 +303,6 @@ async function createHtmlReport() {
   const echartsLibSourceCode = await fetch(echartsCDN).then(response => response.text());
   const echartsLibraryScriptTag = document.createElement("script");
   echartsLibraryScriptTag.text = echartsLibSourceCode;
-
-  // Plotting Script
-  function plotMeasurements() {
-      var chartDom = document.getElementById('measurementsTimeline');
-      var myChart = echarts.init(chartDom);
-      var option;
-
-
-      const measurementData = JSON.parse(document.getElementById('measurementData').text);
-      const measurementIds = measurementData.map(entry => entry.name);
-      const uniqueMeasurementIds = [...new Set(measurementIds)];
-
-      const plotData = measurementData.map(
-        entry => {
-          const measurementIdIndex = uniqueMeasurementIds.indexOf(entry.name);
-
-          return {
-            name: entry.name,
-            value: [
-              measurementIdIndex,
-              entry.startTime,
-              entry.startTime + entry.duration,
-              entry.duration
-            ]
-          }
-        }
-      );
-
-      function renderItem(params, api) {
-        var categoryIndex = api.value(0);
-        var start = api.coord([api.value(1), categoryIndex]);
-        var end = api.coord([api.value(2), categoryIndex]);
-        var height = api.size([0, 1])[1] * 0.6;
-        var rectShape = echarts.graphic.clipRectByRect(
-          {
-            x: start[0],
-            y: start[1] - height / 2,
-            width: end[0] - start[0],
-            height: height
-          },
-          {
-            x: params.coordSys.x,
-            y: params.coordSys.y,
-            width: params.coordSys.width,
-            height: params.coordSys.height
-          }
-        );
-        return (
-          rectShape && {
-            type: 'rect',
-            transition: ['shape'],
-            shape: rectShape,
-            style: api.style()
-          }
-        );
-      }
-      option = {
-        tooltip: {
-          formatter: function (params) {
-            return params.marker + params.name + ': ' + params.value[3] + ' ms';
-          }
-        },
-        title: {
-          text: 'shiny.tictoc report',
-          left: 'center'
-        },
-        dataZoom: [
-          {
-            type: 'slider',
-            filterMode: 'weakFilter',
-            showDataShadow: false,
-            top: 400,
-            labelFormatter: ''
-          },
-          {
-            type: 'inside',
-            filterMode: 'weakFilter'
-          }
-        ],
-        grid: {
-          height: 300,
-          containLabel: true
-        },
-        xAxis: {
-          min: 0,
-          scale: true,
-          axisLabel: {
-            formatter: function (val) {
-              return Math.max(0, val) + ' ms';
-            }
-          }
-        },
-        yAxis: {
-          data: uniqueMeasurementIds
-        },
-        series: [
-          {
-            type: 'custom',
-            renderItem: renderItem,
-            itemStyle: {
-              opacity: 0.8
-            },
-            encode: {
-              x: [1, 2],
-              y: 0
-            },
-            data: plotData
-          }
-        ]
-      };
-
-      option && myChart.setOption(option);
-  }
 
   const plottingScript = document.createElement("script");
   plottingScript.text = `${plotMeasurements.toString()}; window.onload = plotMeasurements`;
