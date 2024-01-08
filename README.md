@@ -13,7 +13,7 @@ To start using `shiny.tictoc` in your app, just add the following line somewhere
 
 ```r
 tags$script(
-    src = "https://cdn.jsdelivr.net/gh/Appsilon/shiny.tictoc@v0.1.0/shiny-tic-toc.min.js"
+    src = "https://cdn.jsdelivr.net/gh/Appsilon/shiny.tictoc@v0.2.0/shiny-tic-toc.min.js"
 )
 ```
 
