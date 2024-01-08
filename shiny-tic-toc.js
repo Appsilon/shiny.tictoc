@@ -202,7 +202,6 @@ function exportMeasurements() {
 function plotMeasurements() {
   const chartDom = document.getElementById('measurementsTimeline');
   const myChart = echarts.init(chartDom);
-  var option;
 
   const measureTypeToColor = new Map()
   measureTypeToColor.set('server_computation', '#7b9ce1');
@@ -263,7 +262,8 @@ function plotMeasurements() {
       }
     );
   }
-  option = {
+
+  const option = {
     tooltip: {
       formatter: function (params) {
         return params.marker + params.name + ': ' + params.value[3] + ' ms ' + `<br>type: ${params.value[4]}`;
